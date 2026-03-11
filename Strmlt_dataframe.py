@@ -10,7 +10,7 @@ status = ['Active']
 st.title("Part Listing Cost Analysis")
 @st.cache_data
 def get_un_data():
-    data = pd.read_csv('C:\\Users\\ShaRez\\PyCharmMiscProject\\Data files\\TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
+    data = pd.read_csv('TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
     df = pd.DataFrame(data)
 
     # list_drop = [list(df.head())[i] if list(df.head())[i].startswith("Column") for i in range(len(df.columns))]
@@ -49,4 +49,5 @@ for i,item in enumerate(parameter):
     print(i,item)
     df1=df.sort_values(by=item, ascending=False).tail(Top)#df.nlargest(n=20, columns=item) #df.sort_values(by=item, inplace=True, ascending=False)
     st.bar_chart(df1,x="PartNum",y=item, stack=None,color=colors[i])
+
 
