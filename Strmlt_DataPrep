@@ -1,0 +1,342 @@
+import pandas as pd
+import numpy as np
+import plotly
+import streamlit as st
+
+'''
+The files are exported from PDTrak, portfolio -> report
+filter: Projects -> filter by process -> Taco Global
+'''
+main_path = 'C:\\Users\\ShaRez\\OneDrive - Taco Inc\\Desktop\\PyCharmMiscProject\\Data files\\'
+file_path1 = main_path+'Project Age 5279.csv'
+file_path2 = main_path+'Phase Duration By Project 3330.csv'
+file_path4 = main_path+'Phase Duration By Project 23547_saved.csv'
+# skiprows=1 ignores the "task duration (# weeks)" row
+df1 = pd.read_csv(file_path1, skiprows=1,index_col=False)
+df2 = pd.read_csv(file_path2, skiprows=1,index_col=False)
+df4 = pd.read_csv(file_path4, skiprows=1,index_col=False)
+#df4.drop(columns=[' Status','Investigation','Feasibility','Development','Pilot','Launch'],inplace=True)
+df4 = df4.loc[:,['Project', 'dept (0 residential)', 'buy/resell 0']].copy()
+# df2['Project Name'] = df2['Project']
+## df4.rename(columns={'Project':'Project Name'}, inplace=True)
+df4.columns = ['Project Name', 'dept (0 residential)', 'buy/resell 0']
+# df2.rename(columns={'Project':'Project Name'}, inplace=True)
+df2.columns = ['Project Name', ' Status', 'Investigation', 'Feasibility', 'Development',
+       'Pilot', 'Launch', 'Unnamed: 7', 'Unnamed: 8']
+# df2.drop(columns=[' Status'], inplace=True)
+df2 = df2.loc[:,['Project Name', 'Investigation', 'Feasibility', 'Development',
+       'Pilot', 'Launch', 'Unnamed: 7', 'Unnamed: 8']].copy()
+df_merged = pd.merge(df1, df2,on='Project Name')
+df_merged = pd.merge(df_merged, df4,on='Project Name')
+df_merged = df_merged.dropna(subset=['Project Created'])
+# df_merged.drop(columns=['Unnamed: 7','Unnamed: 8', 'Unnamed: 12','Attributes','Timing','Resource Allocation','Costs','Payback','Project','Charter'], inplace=True)
+df_merged = df_merged.loc[:,['Project Name', 'Project Number', 'Status', 'Project Manager', 'Project Created',
+            'Investigation', 'Feasibility', 'Development', 'Pilot', 'Launch', 'dept (0 residential)', 'buy/resell 0']].copy()
+excluded_statuses = ['Proposed', 'Cancelled', 'Active(On Hold)']
+filtered_df = df_merged[~df_merged['Status'].isin(excluded_statuses) & ~df_merged['Project Name'].str.contains('AD|HS|CR|TIA|TNG|TF|Oneida|Putnam',na=False)
+                        & ~df_merged['Project Number'].str.contains('6082',na=False)]
+
+filtered_df = filtered_df .fillna(0)
+
+filtered_df['start_Investigation'] = pd.to_datetime(filtered_df['Project Created'])
+filtered_df['start_Feasibility'] = pd.to_datetime(filtered_df['start_Investigation']) + pd.to_timedelta(filtered_df['Investigation'], unit='W')
+filtered_df['start_Development'] = pd.to_datetime(filtered_df['start_Feasibility']) + pd.to_timedelta(filtered_df['Feasibility'], unit='W')
+filtered_df['start_Pilot'] = pd.to_datetime(filtered_df['start_Development']) + pd.to_timedelta(filtered_df['Development'], unit='W')
+filtered_df['start_Launch'] = pd.to_datetime(filtered_df['start_Pilot']) + pd.to_timedelta(filtered_df['Pilot'], unit='W')
+filtered_df['end_Launch'] = pd.to_datetime(filtered_df['start_Launch']) + pd.to_timedelta(filtered_df['Launch'], unit='W')
+
+file_path3 = main_path+'Project Cost Report-filtered.csv'
+
+start_date = pd.to_datetime('12/31/2021')
+end_date = pd.to_datetime('01/31/2026')
+rng = pd.date_range(start_date, end_date,freq='MS')
+header = np.concatenate((['empty','Items', 'Type', 'Cost Over'],rng.astype(str)),axis=0)
+df3 = pd.read_csv(file_path3, skiprows=15,index_col=False)
+df3.columns = header
+df3.drop(columns=['empty'],inplace=True)
+df3 = df3.fillna(0)
+
+
+
+inv_array = np.zeros_like(filtered_df['Status'])
+feas_array = np.zeros_like(filtered_df['Status'])
+dev_array = np.zeros_like(filtered_df['Status'])
+pil_array = np.zeros_like(filtered_df['Status'])
+lnch_array = np.zeros_like(filtered_df['Status'])
+
+
+for i,prj in enumerate(filtered_df['Project Name']):
+    ind = int(filtered_df['Project Name'].index[i])
+    daterange = pd.date_range(max(filtered_df['start_Investigation'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2022-01-01')),
+                              min(filtered_df['start_Feasibility'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2026-01-01')),
+                              freq='MS')
+    row = (df3['Items'].str.contains(prj,case=False,na=False)).idxmax()
+    inv_cost = 0
+    while df3['Items'][row] != 'Totals:':
+        for j in daterange:
+            addd = df3[str(j).split(' ')[0]][row] if type(df3[str(j).split(' ')[0]][row])!= str else int(df3[str(j).split(' ')[0]][row].replace(',', '') )
+            inv_cost += addd
+        row += 1
+    inv_array[i] = int(inv_cost)
+
+    daterange = pd.date_range(max(filtered_df['start_Feasibility'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2022-01-01')),
+                              min(filtered_df['start_Development'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2026-01-01')),
+                              freq='MS')
+    row = (df3['Items'].str.contains(prj,case=False,na=False)).idxmax()
+    feas_cost = 0
+    while df3['Items'][row] != 'Totals:':
+        for j in daterange:
+            addd = df3[str(j).split(' ')[0]][row] if type(df3[str(j).split(' ')[0]][row]) != str else int(
+                df3[str(j).split(' ')[0]][row].replace(',', ''))
+            feas_cost += addd
+        row += 1
+        row += 1
+    feas_array[i] = feas_cost
+
+    dev_cost = 0
+    daterange = pd.date_range(max(filtered_df['start_Development'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2022-01-01')),
+                              min(filtered_df['start_Pilot'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2026-01-01')),
+                              freq='MS')
+    row = (df3['Items'].str.contains(prj,case=False,na=False)).idxmax()
+    while df3['Items'][row] != 'Totals:':
+        for j in daterange:
+            addd = df3[str(j).split(' ')[0]][row] if type(df3[str(j).split(' ')[0]][row]) != str else int(
+                df3[str(j).split(' ')[0]][row].replace(',', ''))
+            dev_cost += addd
+        row += 1
+    dev_array[i] = dev_cost
+
+    pil_cost = 0
+    daterange = pd.date_range(max(filtered_df['start_Pilot'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2022-01-01')),
+                              min(filtered_df['start_Launch'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2026-01-01')),
+                              freq='MS')
+    row = (df3['Items'].str.contains(prj,case=False,na=False)).idxmax()
+    while df3['Items'][row] != 'Totals:':
+        for j in daterange:
+            addd = df3[str(j).split(' ')[0]][row] if type(df3[str(j).split(' ')[0]][row]) != str else int(
+                df3[str(j).split(' ')[0]][row].replace(',', ''))
+            pil_cost += addd
+        row += 1
+    pil_array[i] = pil_cost
+
+    lau_cost = 0
+    daterange = pd.date_range(max(filtered_df['start_Launch'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2022-01-01')),
+                              min(filtered_df['end_Launch'][ind]-pd.Timedelta(700,'h'),pd.Timestamp('2026-01-01')),
+                              freq='MS')
+    row = (df3['Items'].str.contains(prj,case=False,na=False)).idxmax()
+    while df3['Items'][row] != 'Totals:':
+        for j in daterange:
+            addd = df3[str(j).split(' ')[0]][row] if type(df3[str(j).split(' ')[0]][row]) != str else int(
+                df3[str(j).split(' ')[0]][row].replace(',', ''))
+            lau_cost += addd
+        row += 1
+    lnch_array[i] = lau_cost
+
+filtered_df['Investigation Cost'] = inv_array
+filtered_df['Feasibility Cost'] = feas_array
+filtered_df['Development Cost'] = dev_array
+filtered_df['Pilot Cost'] = pil_array
+filtered_df['Launch Cost'] = lnch_array
+
+
+filtered_df.to_csv('filtered_df_csv.csv')
+cols1 = ['Project Name', 'Project Number', 'Status', 'Investigation', 'dept (0 residential)', 'buy/resell 0', 'start_Investigation',	'start_Feasibility', 'Investigation Cost']
+cols2 = ['Project Name', 'Project Number', 'Status', 'Feasibility', 'dept (0 residential)', 'buy/resell 0', 'start_Feasibility',	'start_Development', 'Feasibility Cost']
+cols3 = ['Project Name', 'Project Number', 'Status', 'Development', 'dept (0 residential)', 'buy/resell 0', 'start_Development',	'start_Pilot', 'Development Cost']
+cols4 = ['Project Name', 'Project Number', 'Status', 'Pilot', 'dept (0 residential)', 'buy/resell 0', 'start_Pilot',	'start_Launch', 'Pilot Cost']
+cols5 = ['Project Name', 'Project Number', 'Status', 'Launch', 'dept (0 residential)', 'buy/resell 0', 'start_Launch',	'end_Launch', 'Launch Cost']
+
+df_print = filtered_df[cols1]
+
+ph_column = np.append(['Investigation'] * len(filtered_df[cols1]), ['Feasibility'] * len(filtered_df[cols1]))
+ph_column = np.append(ph_column,['Development'] * len(filtered_df[cols1]))
+ph_column = np.append(ph_column,['Pilot'] * len(filtered_df[cols1]))
+ph_column = np.append(ph_column,['Launch'] * len(filtered_df[cols1]))
+# df_print .rename(columns={'Investigation':'Phase_Length','start_Investigation':'Start_Phase','start_Feasibility':'End_Phase','Investigation Cost':"Phase_Cost"}, inplace=True)
+df_print.columns = ['Project Name', 'Project Number', 'Status', 'Phase_Length',
+       'dept (0 residential)', 'buy/resell 0', 'Start_Phase',
+       'End_Phase', "Phase_Cost"]
+clmns = [cols1, cols2, cols3, cols4, cols5]
+phases = ['Investigation','Feasibility','Development','Pilot','Launch']
+for i in range(len(clmns)-1):
+    add1 = filtered_df[clmns[i+1]]
+    add1.columns = ['Project Name', 'Project Number', 'Status', 'Phase_Length',
+                    'dept (0 residential)', 'buy/resell 0', 'Start_Phase',
+                    'End_Phase', "Phase_Cost"]
+    # if phases[i+1]=='Launch':
+    #     # add1.rename(columns={phases[i+1]:'Phase_Length','start_'+phases[i+1]:'Start_Phase','end_'+phases[i+1]:'End_Phase',phases[i+1]+' Cost':"Phase_Cost"}, inplace=True)
+    #     add1.columns = ['Project Name', 'Project Number', 'Status', 'Phase_Length',
+    #                     'dept (0 residential)', 'buy/resell 0', 'Start_Phase',
+    #                     'End_Phase', "Phase_Cost"]
+    # else:
+    #     # add1.rename(columns={phases[i+1]:'Phase_Length','start_'+phases[i+1]:'Start_Phase','start_'+phases[i+2]:'End_Phase',phases[i+1]+' Cost':"Phase_Cost"}, inplace=True)
+    #     add1.columns = ['Project Name', 'Project Number', 'Status', 'Phase_Length',
+    #                     'dept (0 residential)', 'buy/resell 0', 'Start_Phase',
+    #                     'End_Phase', "Phase_Cost"]
+    df_print = pd.concat([df_print,add1],axis=0,ignore_index=True)
+
+df_print['Phase'] = ph_column
+df_print.to_csv('df_print.csv')
+# Gantt Chart ################################################################
+import plotly.express as px
+from datetime import datetime
+
+color_map = {
+    '2026Q1': '#ff2b2b', '2026Q2': '#faca2b', '2026Q3': '#0068c9', '2026Q4': '#09ab3b',
+    '2027Q1': '#fffd80', '2027Q2': '#1fb451', '2027Q3': '#1fb435', '2027Q4': '#24b41f'
+}
+
+
+#
+# fig=px.timeline(
+#     filtered_df,
+#     x_start='start_Investigation',
+#     x_end='end_Launch',
+#     y=filtered_df["Project Name"],
+#     color='Status',
+#     color_discrete_map=color_map,
+#     title="Project Timeline (Imported from Excel)",
+#     labels={"Project": "Project Name"},
+#     hover_data= "Status",
+#     facet_row_spacing = 0.01,
+#     facet_col_spacing = 0.01,
+#     width=1200, height=900,
+# )
+#
+# fig.update_xaxes(range=["2020-01-01", "2029-01-01"],side="top")
+# fig.update_yaxes(autorange="reversed")  # First tasks at the top
+# fig.add_vline(x=datetime.now(), line_width=3, line_dash="dash", line_color="red")
+#
+#
+# # fig.write_image('PdTraktimeline.svg')
+# fig.write_html("PdTraktimeline.html")
+# st.plotly_chart(fig, use_container_width=True)
+
+# Phases #################################################
+import plotly.graph_objects as go
+import plotly.io as pio
+
+pio.templates.default = "plotly"
+
+fig = px.timeline(
+    df_print,
+    x_start='Start_Phase',
+    x_end='End_Phase',
+    y="Project Name",
+    color='Phase',
+    color_discrete_map=color_map,
+    title="Project Timeline (Imported from Excel)",
+    labels={"Project": "Project Name"},
+    hover_name="Project Name",
+    hover_data = ['Status','Phase_Cost'],
+    facet_row_spacing = 0.0,
+    facet_col_spacing = 0.01,
+    width=1200, height=600,
+    text = 'Phase_Cost',
+
+)
+
+fig.update_traces(textposition='inside', insidetextanchor='middle',texttemplate='%{text}$')
+# fig = go.Figure(data=fig1.data + fig2.data)
+fig.update_layout(xaxis_type="date",font=dict(family='Arial',size=8,color='black'),template='plotly')
+fig.update_xaxes(range=["2020-01-01", "2029-01-01"],side="top")
+
+
+fig.update_yaxes(autorange="reversed",showgrid=True,
+    gridcolor='white',
+    griddash='dash')  # First tasks at the top
+fig.add_vline(x=datetime.now(), line_width=3, line_dash="dash", line_color="red")
+
+# fig.show()
+st.plotly_chart(fig)#, theme=None, use_container_width=True)
+# fig.write_image('PdTraktimeline_details.svg')
+st.write('running')
+fig.write_html('PdTraktimeline_details.html')
+###################################### ML Training ##############################################3
+#
+# # Prep training materials:
+# mean_inv_cost = int(np.mean(filtered_df['Investigation Cost']))
+# mean_feas_cost = int(np.mean(filtered_df['Feasibility Cost']))
+# mean_dev_cost = int(np.mean(filtered_df['Development Cost']))
+# mean_lau_cost = int(np.mean(filtered_df['Launch Cost']))
+# mean_pil_cost = int(np.mean(filtered_df['Pilot Cost']))
+# filtered_df['Investigation Cost'] = filtered_df['Investigation Cost'].replace(0, mean_inv_cost)
+# filtered_df['Feasibility Cost'] = filtered_df['Feasibility Cost'].replace(0, mean_feas_cost)
+# filtered_df['Development Cost'] = filtered_df['Development Cost'].replace(0, mean_dev_cost)
+# filtered_df['Launch Cost'] = filtered_df['Launch Cost'].replace(0, mean_lau_cost)
+# filtered_df['Pilot Cost'] = filtered_df['Pilot Cost'].replace(0, mean_lau_cost)
+#
+#
+# from sklearn.multioutput import MultiOutputRegressor
+# from sklearn.ensemble import GradientBoostingRegressor
+#
+# X_cols = ['dept (0 residential)','buy/resell 0']
+# X = filtered_df[X_cols].values.reshape(-1,len(X_cols))
+#
+# y_cols = ['Investigation', 'Feasibility', 'Development', 'Launch', 'Pilot', 'Investigation Cost', 'Feasibility Cost',
+#           'Development Cost', 'Launch Cost', 'Pilot Cost']
+# y = filtered_df[y_cols].values.T.reshape(-1,len(y_cols))
+#
+# X_train = X[0:int(0.8*len(X))]
+# X_test = X[int(0.8*len(X))+1:-1]
+# y_train = y[0:int(0.8*len(y))]
+# y_test = y[int(0.8*len(y))+1:-1]
+# print(f"Training data shape: {X_train.shape}, Testing data shape: {X_test.shape}")
+#
+# base_estimator = GradientBoostingRegressor(random_state=42)
+#
+# # Wrap the base estimator with MultiOutputRegressor
+# multi_target_regressor = MultiOutputRegressor(base_estimator)
+#
+# # Fit the model
+# multi_target_regressor.fit(X, y)
+#
+# # Make predictions
+# y_pred = multi_target_regressor.predict(X)
+# print(multi_target_regressor.score(X_test, y_test))
+#
+# import matplotlib.pyplot as plt
+# print(y_pred)
+#
+# if y_test.shape[1] >= 2:
+#     fig1 = plt.figure(figsize=(8, 6))
+#
+#     # Plot Target 1: Actual vs. Predicted
+#     plt.scatter(y[:, 0], y_pred[:, 0], color='blue', label='Target 1', alpha=0.5)
+#
+#     # Plot Target 2: Actual vs. Predicted
+#     plt.scatter(y[:, 1], y_pred[:, 1], color='red', label='Target 2', alpha=0.5)
+#     # Plot Target 4: Actual vs. Predicted
+#     plt.scatter(y[:, 4], y_pred[:, 4], color='yellow', label='Target 4', alpha=0.5)
+#     # Plot Target 5: Actual vs. Predicted
+#     plt.scatter(y[:, 5], y_pred[:, 5], color='green', label='Target 5', alpha=0.5)
+#
+#     # Plot the ideal line (y=x)
+#     max_val = max(np.max(y), np.max(y_pred))
+#     min_val = min(np.min(y), np.min(y_pred))
+#     # plt.plot([min_val, max_val], [min_val, max_val], 'k--', lw=2, label='Ideal Prediction')
+#
+#     plt.xlabel('Actual Values')
+#     plt.ylabel('Predicted Values')
+#     plt.title('Multi-Output Regression: Actual vs. Predicted per Target')
+#     plt.legend()
+#     # plt.show()
+#     st.plotly_chart(fig1)
+#
+#     fig2= plt.figure(figsize=(8, 6))
+#     plt.plot(range(len(y_pred[:, 5])), y_pred[:, 5], color='black', label='Predicted values')
+#     plt.plot(range(len(y[:, 5])), y[:, 5], color='gray', label='test values')
+#     # plt.show()
+#     st.plotly_chart(fig2)
+# else:
+#     print("Dataset does not have enough targets for this 2D visualization.")
+#
+# import seaborn as sns
+#
+# fig3 = plt.figure(figsize = (8,5))
+# sns.heatmap(filtered_df[['Investigation', 'Feasibility', 'Development',
+#        'Pilot', 'Launch', 'Investigation Cost','Feasibility Cost', 'Development Cost', 'Pilot Cost', 'Launch Cost',
+#                          'dept (0 residential)', 'buy/resell 0']].corr(), cbar = False, annot = True, cmap='coolwarm', fmt=".2f")
+# # plt.show()
+# st.plotly_chart(fig3)
+#
