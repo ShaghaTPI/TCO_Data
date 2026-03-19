@@ -16,7 +16,7 @@ with tab1:
     st.title("Part Listing Cost Analysis")
     @st.cache_data
     def get_un_data():
-        data = pd.read_csv(main_path+'TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
+        data = pd.read_csv('TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
         df = pd.DataFrame(data)
 
         # list_drop = [list(df.head())[i] if list(df.head())[i].startswith("Column") for i in range(len(df.columns))]
