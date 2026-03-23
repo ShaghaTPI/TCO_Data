@@ -5,7 +5,7 @@ import altair as alt
 
 #'''streamlit run Strmlt_dataframe.py --server.maxMessageSize 1000'''
 main_path = 'C:\\Users\\ShaRez\\OneDrive - Taco Inc\\Desktop\\PyCharmMiscProject\\Data files\\'
-tab1, tab2 = st.tabs(["📈 Data Analysis", "🗃 Cost Reduction"])
+tab1, tab2 = st.tabs(["📈 Data Analysis", "💵 Cost Reduction"])
 
 with tab1:
 
@@ -35,11 +35,21 @@ with tab1:
 
     st.markdown(multi)
 
-    parameter = st.multiselect("Choose parameter", list(df.head()), ["PartCost_CurTotUnitCost_c", "PartCost_CurMtlUnitCost_c","PrevYR_Used"])
+    parameter = st.multiselect("Choose parameter", list(df.head()),  ["PartCost_CurTotUnitCost_c",
+                                    "Calculated_StdCost","PrevYR_Used"])
 
-    colors = ["#FF0000", "#0000FF","#00FF00","#FF0000", "#0000FF","#00FF00","#FF0000", "#0000FF","#00FF00","#FF0000",
-              "#24b41f","#1fb435","#1fb451", "#fffd80","#ff2b2b","#faca2b", "#0068c9","#3cff00"]
-
+    colors = {"10FG":"#bd4043", "10RM": "#ff4b4b","10SA":"#ff8c8c","10RP":"#ffc7c7", "66FG":"#a6dcff","66RM":"#60b4ff","66SA":"#1c83e1", "66RP":"#0054a3"}
+    #,"#00FF00","#FF0000","#24b41f","#1fb435","#1fb451", "#fffd80","#ff2b2b","#faca2b", "#0068c9","#3cff00"}
+    #     "#7d353b",  # red100
+    #     "#bd4043", #red90
+    #     "#ff4b4b", #red70
+    #     "#ff8c8c", #red50
+    #     "#ffc7c7", #red30
+    #     "#a6dcff", #blue30
+    #     "#60b4ff", #blue50
+    #     "#1c83e1", #blue70
+    #     "#0054a3", #blue90
+    #     "#004280", #blue100
     Top = st.slider("How many parts?", 0, 30, 25)
     st.markdown("---")
     st.subheader(f"Top {Top} are shown:")
@@ -47,15 +57,47 @@ with tab1:
     for i,item in enumerate(parameter):
         print(i,item)
         df1=df.sort_values(by=item, ascending=False).head(Top)#df.nlargest(n=20, columns=item) #df.sort_values(by=item, inplace=True, ascending=False)
-        st.bar_chart(df1,x="PartNum",y=item, stack=None,color=colors[i])
+        # st.bar_chart(df1,x="PartNum",y=item, stack=None,color="ClassID")#colors[-1-i])
+        bars = (
+            alt.Chart(df1,title=f" {Top} Products with highest {item}")
+            .mark_bar()
+            .encode(
+                x="PartNum",
+                y=item,
+                color=alt.Color("ClassID", scale=alt.Scale(domain=list(colors.keys()),range=list(colors.values()))),
+            ).properties(width=600, height=200)
+        )
+        if i==0:
+            chart0 = bars
+        else:
+            chart1 = alt.vconcat(chart0,bars)
+            chart0 = chart1
+    st.altair_chart(chart0, theme="streamlit")
 
     st.markdown("---")
     st.subheader(f"Bottom {Top} are shown:")
+    
     for i,item in enumerate(parameter):
-        print(i,item)
+        # print(i,item)
         df1=df.sort_values(by=item, ascending=False).tail(Top)#df.nlargest(n=20, columns=item) #df.sort_values(by=item, inplace=True, ascending=False)
-        st.bar_chart(df1,x="PartNum",y=item, stack=None,color=colors[-1-i])
+        # st.bar_chart(df1,x="PartNum",y=item, stack=None,color="ClassID")#colors[-1-i])
+        bars = (
+            alt.Chart(df1,title=f" {Top} Products with lowest {item}")
+            .mark_bar()
+            .encode(
+                x="PartNum",
+                y=item,
+                color=alt.Color("ClassID", scale=alt.Scale(domain=list(colors.keys()),range=list(colors.values()))),
+            ).properties(width=600, height=200)
+        )
 
+        if i==0:
+            chart0 = bars
+        else:
+            chart1 = alt.vconcat(chart0,bars)#, data=df4, title="Cost Reduction Analysis " + item)
+            chart0 = chart1
+    # chart = alt.layer(chart0).resolve_scale(color='shared')
+    st.altair_chart(chart0, theme="streamlit")
 
 # _________________________________________________________
 import subprocess
@@ -74,7 +116,7 @@ with tab2:
         "Select a price range",
         min_value=0.0,
         max_value=500.0,
-        value=(24.0, 27.0),  # Initial selected range
+        value=(2.0, 35.0),  # Initial selected range
         step=1.0
     )
     st.write("Selected price range:", price_range[0], "to", price_range[1])
@@ -102,7 +144,7 @@ with tab2:
                 color=alt.Color('PrevYR_Used').scale(scheme='lightgreyred'),
                 # color=colors[-1-i],
                 text=alt.Text('PrevYR_Used', format='.1f'),
-            )
+            ).properties(width=800, height=200)
         )
         text = alt.Chart(df4).mark_text(dx=20, dy=3, color='black',angle=270).encode(#bars.mark_text(baseline="middle").encode(#
             x="PartNum",
