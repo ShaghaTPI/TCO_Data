@@ -18,7 +18,7 @@ with tab1:
     def get_un_data():
         data = pd.read_csv('TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
         df = pd.DataFrame(data)
-        st.write(df.head()
+        st.write(df.head())
 
         # list_drop = [list(df.head())[i] if list(df.head())[i].startswith("Column") for i in range(len(df.columns))]
         # df.drop(columns=list_drop, inplace=True)
