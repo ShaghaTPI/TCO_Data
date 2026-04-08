@@ -27,7 +27,15 @@ with tab1:
         return df2
 
 
-    df = get_un_data()
+    # df = get_un_data()
+    data = pd.read_csv('TacoInc_PartListingWithCost1 - Copy.csv',low_memory=False)
+    df = pd.DataFrame(data)
+
+    # list_drop = [list(df.head())[i] if list(df.head())[i].startswith("Column") for i in range(len(df.columns))]
+    # df.drop(columns=list_drop, inplace=True)
+    df.fillna(0, inplace=True)
+    df1 = df[df['ClassID'].isin(Res_prod) & df['PartActive'].isin(status)]
+    df = df1[df1['PrevYR_Used']>0]
     st.dataframe(df)
 
     st.header("Figures", divider=True)
