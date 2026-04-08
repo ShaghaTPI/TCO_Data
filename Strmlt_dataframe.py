@@ -35,7 +35,7 @@ with tab1:
 
     # list_drop = [list(df.head())[i] if list(df.head())[i].startswith("Column") for i in range(len(df.columns))]
     # df.drop(columns=list_drop, inplace=True)
-    df.fillna(0, inplace=True)
+    ###df.fillna(0, inplace=True)
     df1 = df[df['ClassID'].isin(Res_prod) & df['PartActive'].isin(status)]
     df = df1[df1['PrevYR_Used']>0]
     st.dataframe(df)
